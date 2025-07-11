@@ -1,0 +1,58 @@
+name: Veracode_Basic
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Empacotar e Publicar Artefato
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Empacotamento dos arquivos
+        uses: thedoctor0/zip-release@master
+        with:
+          filename: 'veracode.zip'
+          path: .
+
+      - name: Publicando Artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacoteVeracode
+          path: veracode.zip
+
+  veracode_scan:
+    name: Upload e Análise Veracode
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download do Artefato
+        uses: actions/download-artifact@v4
+        with:
+          name: pacoteVeracode
+
+      - name: Upload e Scan com Veracode
+        uses: veracode/veracode-uploadandscan-action@master
+        with:
+          vid: '${{ secrets.VERACODE_API_ID }}'
+          vkey: '${{ secrets.VERACODE_API_KEY }}'
+          appname: 'Github Actions - ${{ github.repository }}'
+          createsandbox: true
+          filepath: 'veracode.zip'
+          deleteIncompleteScan: false
+          version: '${{ github.run_id }}'
+          criticality: 'VeryHigh'
+        
+  
+  Veracode_SCA:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Veracode SCA
+        env:
+          SRCCLR_API_TOKEN: '${{ secrets.SRCCLR_API_TOKEN }}' # Lembrar de criar as credenciais no Secrets
+        run: |
+          curl -sSL 'https://download.sourceclear.com/ci.sh' | bash -s – scan --update-advisor --allow-dirty
